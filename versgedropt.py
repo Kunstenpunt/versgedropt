@@ -47,7 +47,7 @@ scope = 'user-follow-read'
 musicbrainzngs.set_useragent(app, version, contact=None)
 
 with open('spotify.txt', 'r') as f:
-    client_id, client_secret = f.read().split('\n')
+    client_id, client_secret = f.read().strip().split('\n')
 
 client_credentials_manager = SpotifyClientCredentials(client_id='{0}', client_secret='{1}').format(client_id, client_secret)
 
@@ -62,6 +62,9 @@ with open('mscbrnzids.txt', 'r') as f:
     mbids = f.read().split('\n')
 
 data = []
+
+with open('google.txt', 'r') as f:
+    google_api_key = f.read().strip()
 
 for mbid in mbids:
     try:
@@ -80,10 +83,10 @@ for mbid in mbids:
 
                 if 'youtube' in current_url:
                     username = current_url.strip('/').split('/')[-1]
-                    channel_url = 'https://www.googleapis.com/youtube/v3/channels?part=contentDetails&forUsername={0}&key=AIzaSyAS-k6f8e6rEzC036SWmSXPacOvuLQrn7g'.format(username)
+                    channel_url = 'https://www.googleapis.com/youtube/v3/channels?part=contentDetails&forUsername={0}&key={1}'.format(username, google_api_key)
                     channel_info = loads(get(channel_url).text)
                     playlist_id = channel_info['items'][0]['contentDetails']['relatedPlaylists']['uploads']
-                    items_url = 'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId={0}&key=AIzaSyAS-k6f8e6rEzC036SWmSXPacOvuLQrn7g'.format(playlist_id)
+                    items_url = 'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId={0}&key={1}'.format(playlist_id, google_api_key)
                     items = loads(get(items_url).text)['items']
                     for item in items:
                         album_data = {
