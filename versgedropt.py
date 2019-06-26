@@ -8,9 +8,16 @@ from pandas import DataFrame, read_excel
 from bs4 import BeautifulSoup
 from time import sleep
 from datetime import datetime, timedelta
-from re import compile
+from re import compile, sub
 from codecs import open
+import sys
 from github import Github
+import pysftp
+import unicodedata
+
+
+def remove_control_characters(s):
+    return "".join(ch for ch in s if unicodedata.category(ch)[0]!="C")
 
 
 def get_soup(url):
@@ -25,7 +32,7 @@ def get_soup(url):
 def parse_bc_release(url):
     soup = get_soup(url)
     if soup.find("h2", attrs={"class": "trackTitle"}):
-        title = soup.find("h2", attrs={"class": "trackTitle"}).contents[0].strip()
+        title = soup.find("h2", attrs={"class": "trackTitle"}).get_text().strip()
         artist = soup.find("span", attrs={"itemprop": "byArtist"}).a.contents[0].strip()
         releasedate_str = soup.find("meta", attrs={"itemprop": "datePublished"})["content"]
         releasedate = datetime(int(releasedate_str[0:4]), int(releasedate_str[4:6]), int(releasedate_str[6:8])).date()
@@ -94,21 +101,25 @@ def main():
                                 username = current_url.strip('/').split('/')[-1]
                                 channel_url = 'https://www.googleapis.com/youtube/v3/channels?part=contentDetails&forUsername={0}&key={1}'.format(username, google_api_key)
                                 channel_info = loads(get(channel_url).text)
+                                print("youtube channel info", channel_info)
                                 playlist_id = channel_info['items'][0]['contentDetails']['relatedPlaylists']['uploads']
+                                print("youtube channel id", playlist_id)
                                 items_url = 'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId={0}&key={1}'.format(playlist_id, google_api_key)
 
                             if tiepeurl == "channel":
                                 username = current_url.strip('/').split('/')[-1]
                                 items_url = "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId={0}&type=video&key={1}".format(username, google_api_key)
 
+                            print(tiepeurl, items_url)
                             items = loads(get(items_url).text)['items']
                             for item in items:
+                                print(item)
                                 album_data = {
                                     'band': mbartist['artist']['name'],
                                     'band_id': username,
                                     'platform': 'youtube',
                                     'drop': item['snippet']['title'],
-                                    'drop_id': item['id'],
+                                    'drop_id': item['id']["videoId"] if tiepeurl == "channel" else item["id"],
                                     'drop_url': 'https://www.youtube.com/watch?v=' + item['snippet']['resourceId']['videoId'] if tiepeurl == "user" else 'https://www.youtube.com/watch?v=' + item['id']['videoId'],
                                     'drop_visual': item['snippet']['thumbnails']['default']['url'],
                                     'release_date': parse(item['snippet']['publishedAt']).date()
@@ -121,27 +132,37 @@ def main():
 
                     if 'spotify' in current_url:
                         birdy_uri = 'spotify:artist:{0}'.format(current_url.split('/')[-1])
-                        try:
-                            results = spotify.artist_albums(birdy_uri, album_type='album')
-                            albums = results['items']
-                            while results['next']:
-                                results = spotify.next(results)
-                                albums.extend(results['items'])
-                            for album in albums:
-                                album_data = {
-                                    'band': mbartist['artist']['name'],
-                                    'band_id': current_url.split('/')[-1],
-                                    'platform': 'spotify',
-                                    'drop': album['name'],
-                                    'drop_id': album['id'],
-                                    'drop_url': 'https://open.spotify.com/album/' + album['id'],
-                                    'drop_visual': album['images'][-1]['url'],
-                                    'release_date': parse(album['release_date']).date()
-                                }
-                                print(album_data)
-                                data.append(album_data)
-                        except Exception as e:
-                            print("spotify says", e)
+                        results = spotify.artist_albums(birdy_uri, album_type='album')
+                        albums = results['items']
+                        while results['next']:
+                            results = spotify.next(results)
+                            albums.extend(results['items'])
+
+                        results = spotify.artist_albums(birdy_uri, album_type='single')
+                        albums.extend(results['items'])
+                        while results['next']:
+                            results = spotify.next(results)
+                            albums.extend(results['items'])
+
+                        results = spotify.artist_albums(birdy_uri, album_type='compilation')
+                        albums.extend(results['items'])
+                        while results['next']:
+                            results = spotify.next(results)
+                            albums.extend(results['items'])
+
+                        for album in albums:
+                            album_data = {
+                                'band': mbartist['artist']['name'],
+                                'band_id': current_url.split('/')[-1],
+                                'platform': 'spotify',
+                                'drop': album['name'],
+                                'drop_id': album['id'],
+                                'drop_url': 'https://open.spotify.com/album/' + album['id'],
+                                'drop_visual': album['images'][-2]['url'],
+                                'release_date': parse(album['release_date']).date()
+                            }
+                            print(album_data)
+                            data.append(album_data)
 
                     if 'deezer' in current_url:
                         deezer_id = current_url.split('/')[-1]
@@ -182,22 +203,32 @@ def main():
 
                     if 'bandcamp' in current_url:
                         current_url = current_url.rstrip('/')
-                        try:
-                            html = get(current_url + '/music', headers = {'User-agent': 'Mozilla/5.0'}).text
-                            soup = BeautifulSoup(html, 'html.parser')
-                            done = []
-                            for a in soup.find_all('a', attrs={'href': compile('/album/')}):
+                        print("current_url", current_url)
+                        html = get(current_url + '/music', headers = {'User-agent': 'Mozilla/5.0'}).text
+                        soup = BeautifulSoup(html, 'html.parser')
+                        done = []
+                        if soup.find("div", attrs={"class": "playbutton"}):
+                            album_data = parse_bc_release(current_url + "/music")
+                            print(current_url, album_data)
+                            if album_data:
+                                album_data['band_id'] = current_url
+                                album_data['platform'] = 'bandcamp'
+                                print(album_data)
+                                data.append(album_data)
+                                done.append(current_url)
+                        else:
+                            for a in soup.find_all('a', attrs={'href': compile('album|track')}):
                                 href = a['href']
-                                if href not in done and (current_url in href or href.startswith('/album/')):
+                                print(href)
+                                if href not in done and (current_url in href or href.startswith('/album/') or href.startswith('/track/')):
                                     album_url = href if href.startswith('http') else current_url + href
                                     album_data = parse_bc_release(album_url)
-                                    album_data['band_id'] = current_url
-                                    album_data['platform'] = 'bandcamp'
-                                    print(album_data)
-                                    data.append(album_data)
-                                    done.append(href)
-                        except Exception as e:
-                            print("bandcamp says",e)
+                                    if album_data:
+                                        album_data['band_id'] = current_url
+                                        album_data['platform'] = 'bandcamp'
+                                        print(album_data)
+                                        data.append(album_data)
+                                        done.append(href)
 
                     if 'soundcloud' in current_url:
                         current_url = current_url.rstrip('/')
@@ -225,53 +256,181 @@ def main():
                         except Exception as e:
                             print("soundcloud says", e)
         except Exception as e:
-            print(e)
+           print(e)
+
+    print(len(data))
 
     df = DataFrame(data)
-    df.sort_values(by=['release_date'], ascending=False, inplace=True)
+    df.sort_values(by=['release_date', 'band', 'drop'], ascending=False, inplace=True)
     df.to_excel('versgedropt.xlsx')
 
     ########################################################################################################################
+
+    cnopts = pysftp.CnOpts()
+    cnopts.hostkeys = None
+    with pysftp.Connection('sftp.dc2.gpaas.net', username='145625', password='8YtU%xjNVfgV#Uxn', cnopts=cnopts) as sftp:
+        with sftp.cd('/lamp0/web/vhosts/versgeperst.be/htdocs/versgedropt'):
+            files = sftp.listdir()
+            for file in files:
+                if file.endswith(".html"):
+                    sftp.remove(file)
 
     soundcloud_logo = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Antu_soundcloud.svg/1024px-Antu_soundcloud.svg.png'
     deezer_logo = 'https://e-cdns-files.dzcdn.net/cache/slash/images/common/logos/deezer.c0869f01203aa5800fe970cf4d7b4fa4.png'
     default_logo = 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Vinyl_disc_icon.svg/240px-Vinyl_disc_icon.svg.png'
 
+    now = datetime.now().strftime('%d/%m/%Y, %H:%M:%S')
+
     html = """
     <!DOCTYPE html>
     <html>
-    <body>
-    <h1>Versgedropt</h1>
-    <p>Drops op de online platformen soundcloud, itunes, deezer, bandcamp en spotify. Van artiesten in Belgie, volgens musicbrainz.</p>
-    <table>
-    <tr>
-    {0}
-    </tr>
-    </table>
-    </body>
-    </html>
-    """
+<head>
 
-    df = df.loc[(df['release_date'] >= (datetime.now() - timedelta(days=30)).date()) & (df['release_date'] <= (datetime.now() + timedelta(days=14)).date())]
+	<title>VERZGEDROPT</title>
+	
+	
+<style>	
+.da-thumbs {
+	list-style: none;
+	position: relative;
+	margin: 20px auto;
+	padding: 0;
+}
+.da-thumbs li {
+	float: left;
+	margin: 5px;
+	background: #fff;
+	width: 175px;
+	height: 177px;
+	padding: 8px;
+	position: relative;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.da-thumbs li.dropdate {
+	float: left;
+	margin: 5px;
+	width: 175px;
+	height: 177px;
+	background-color: white;
+/*	padding: 8px; */
+	position: relative;
+	box-shadow: 0 0px 0px rgba(0,0,0,0.1);
+}
+
+.da-thumbs li.dropdate span {
+	font-family: impact;
+	text-transform: uppercase;
+	font-weight: normal;
+	font-size:50px;
+	text-align:center;
+	color: black;
+	margin-top:0px;
+	display: inline-block;
+	vertical-align: middle;
+	line-height: normal;
+}
+
+.da-thumbs li a,
+.da-thumbs li a img {
+	display: block;
+	position: relative;
+}
+.da-thumbs li a img.dropicon {
+		display: block;
+		position: absolute;
+		top: 100px;
+		left: 100px;
+		z-index:5;
+		}
+
+.da-thumbs li a {
+	overflow: hidden;
+}
+.da-thumbs li a div {
+	position: absolute;
+	background: #333;
+	background: rgba(75,75,75,0.7);
+	width: 100%;
+	height: 100%;
+}
+.da-thumbs li a div span {
+	display: block;
+	font-size: 12px;
+	padding: 10px 0;
+	margin: 40px 20px 20px 20px;
+	text-transform: uppercase;
+	font-weight: normal;
+	color: rgba(255,255,255,0.9);
+	text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+	border-bottom: 1px solid rgba(255,255,255,0.5);
+	box-shadow: 0 1px 0 rgba(0,0,0,0.1), 0 -10px 0 rgba(255,255,255,0.3);
+}
+.hoes {
+	width:175px;
+	height:175px;
+	display: inline-block;
+}
+
+</style>
+
+	
+	
+	
+        <script src="js/modernizr.custom.97074.js"></script>
+		 <noscript><link rel="stylesheet" type="text/css" href="css/noJS.css"/></noscript>
+		 
+<link href='https://fonts.googleapis.com/css?family=Viga|Inconsolata' rel='stylesheet'>		 
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+		<script type="text/javascript" src="js/jquery.hoverdir.js"></script>	
+		<script type="text/javascript">
+			$(function() {
+			
+				$(' #da-thumbs > li ').each( function() { $(this).hoverdir(); } );
+
+			});
+		</script>
+		
+</head>
+<body>
+
+
+
+<img src="images/versgedropt.png" />
+
+<p style="font-family: courier; font-size:14px; margin-left:20px;">Updated """ + now
+
+    menu = """</p>
+
+<div style="text-align: center; font-family: sans-serif; color: #222222; margin: auto; width: 50%; padding: 10px;"><a href="{previous_page_name}" style="font-size: smaller; color: silver;">&laquo; VORIGE</a> &nbsp; <b>&darr; DEZE MAAND &darr;</b> &nbsp; <a href="{next_month_name}" style="font-size: smaller; color: silver;">VOLGENDE &raquo;</a></div>
+
+<section>
+<ul id="da-thumbs" class="da-thumbs">
+"""
+
+    df = df.loc[(df['release_date'] >= (datetime(2010, 1, 1).date())) & (df['release_date'] <= (datetime.now() + timedelta(days=60)).date())]
 
     html_lines = []
     rows = df.iterrows()
-    length = 0
-    width = 10
     previous_release_date = ''
+    previous_page_name = ''
+    previous_previous_page_name = ''
 
     for row in rows:
         row = row[1]
         release_date = row['release_date'].isoformat()
+        release_date_str = row['release_date'].strftime('%-d %b %Y')
+        page_name = row['release_date'].strftime('%b %Y').replace(' ', '') + ".html"
 
         drop_visual = ''
+
         if not str(row['drop_visual']).startswith('http'):
             if row['platform'] == 'soundcloud':
                 drop_visual = soundcloud_logo
             elif row['platform'] == 'deezer':
                 drop_visual = deezer_logo
             else:
-                drop_visual == default_logo
+                drop_visual = default_logo
         else:
             drop_visual = row['drop_visual']
 
@@ -282,39 +441,69 @@ def main():
         else:
             drop_url = row['drop_url']
 
-        html_line = '<td width = 100 style = "vertical-align: top"><a href="{0}"><img src = "{1}" alt = "{2}" height = "100px" width = "100px">{2}</a></td>'.format(
+        drop_icon = ''
+        if row['platform'] == 'soundcloud':
+            drop_icon = 'images/dropicon-soundcloud.png'
+        elif row['platform'] == 'deezer':
+            drop_icon = 'images/dropicon-deezer.png'
+        elif row['platform'] == 'itunes':
+            drop_icon = 'images/dropicon-apple.png'
+        elif row['platform'] == 'bandcamp':
+            drop_icon = 'images/dropicon-bandcamp.png'
+        elif row['platform'] == 'spotify':
+            drop_icon = 'images/dropicon-spotify.png'
+        elif row['platform'] == 'youtube':
+            drop_icon = 'images/dropicon-youtube.png'
+        else:
+            drop_icon = default_logo
+
+        html_line = '<li><a href="{0}"><span class="hoes" style="background:url({1});background-size: 175px 175px;" /><img src="{2}"></span><div><span>{3}</span></div></a></li>'.format(
             drop_url,
             drop_visual,
-            row['band'] + ' - ' + row['drop']
+            drop_icon,
+            sub('', '', (row['band'] + ' - ' + row['drop'])[0:85])
         )
 
+        if page_name != previous_page_name and previous_page_name != '':
+            print("making", previous_page_name)
+            html_lines.append("</ul></section></body></html>")
+
+            html_data = '\n'.join(html_lines)
+
+            menu_html = menu.format(next_month_name=previous_previous_page_name, previous_page_name=page_name if page_name != datetime.now().strftime('%b %Y').replace(' ', '') + ".html" else "index.html")
+            html_full = html + menu_html + html_data
+
+            current_page_name = "index.html" if previous_page_name == datetime.now().strftime('%b %Y').replace(' ', '') + ".html" else previous_page_name
+            #current_page_name = "index.html" if previous_page_name == "Mar2018.html" else previous_page_name
+
+            with open(current_page_name, 'w', 'utf-8') as f:
+                f.write(remove_control_characters(html_full))
+
+            cnopts = pysftp.CnOpts()
+            cnopts.hostkeys = None
+            with pysftp.Connection('sftp.dc2.gpaas.net', username='145625', password='8YtU%xjNVfgV#Uxn', cnopts=cnopts) as sftp:
+                with sftp.cd('/lamp0/web/vhosts/versgeperst.be/htdocs/versgedropt'):
+                    print("pushing", current_page_name)
+                    sftp.put(current_page_name)
+
+            html_lines = []
+            previous_previous_page_name = current_page_name
+
+        previous_page_name = page_name
+
         if release_date != previous_release_date:
-            html_lines.append('</tr></table><h3>{0}</h3><table><tr>'.format(release_date))
-            length = 0
+            html_lines.append('<li class="dropdate"><span>{0}<br />&rarr;</span></li>'.format(release_date_str))
 
         html_lines.append(html_line)
 
-        if length % width == width-1:
-            html_lines.append('</tr><tr>')
-
-        length += 1
         previous_release_date = release_date
-
-    with open('versgedropt.html', 'w', 'utf-8') as f:
-        f.write(html.format('\n'.join(html_lines)))
-
-    with open("versgedropt.html", "r", "utf-8") as f:
-        to_push = f.read()
-
-    user = "ruettet"
-    pwd = open("github.txt", "r").read()
-
-    g = Github(user, pwd)
-    repo = g.get_repo('Kunstenpunt/kunstenpunt.github.com')
-    contents = repo.get_contents("versgedropt.html")
-    repo.update_file(contents.path, "update", to_push, contents.sha)
 
 
 if __name__ == "__main__":
-    while True:
+    if len(sys.argv) > 1:
+        print("testing")
         main()
+    else:
+        while True:
+            if datetime.now().hour == 22:
+                main()
