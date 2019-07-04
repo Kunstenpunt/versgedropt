@@ -470,7 +470,9 @@ class Versgedropt(object):
 
 
 if __name__ == "__main__":
-    vg = Versgedropt(test=True)
+    vg = Versgedropt(test=False)
     vg.set_mbids(mscbrnz_path="")
-    vg.get_drops_for_musicbrainz_belgians()
-    vg.generate_website()
+    while True:
+        if datetime.now().hour == 22:
+            vg.get_drops_for_musicbrainz_belgians()
+            vg.generate_website()
