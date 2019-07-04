@@ -388,7 +388,7 @@ class Versgedropt(object):
         #set last updated line
         template.find("p", attrs={"id": "last_updated"}).insert(0, datetime.now().strftime('%d/%m/%Y, %H:%M:%S'))
 
-        filtered_df = self.df.loc[(self.df['release_date'] >= (datetime(2010, 1, 1).date())) & (self.df['release_date'] <= (datetime.now() + timedelta(days=60)).date())]
+        filtered_df = self.df.loc[(self.df['release_date'] >= (datetime(2010, 1, 1).date())) & (self.df['release_date'] <= (datetime.now() + timedelta(days=120)).date())]
         rows = filtered_df.iterrows()
 
         previous_release_date = ''
@@ -439,6 +439,7 @@ class Versgedropt(object):
 
                 template.find("a", attrs={"id": "vorige-maand"})["href"] = page_name if page_name != datetime.now().strftime('%b %Y').replace(' ', '') + ".html" else "index.html"
                 template.find("a", attrs={"id": "volgende-maand"})["href"] = previous_previous_page_name
+                template.find("a", attrs={"id": "deze-maand"}).string = previous_page_name
 
                 current_page_name = "index.html" if previous_page_name == datetime.now().strftime('%b %Y').replace(' ', '') + ".html" else previous_page_name
 
