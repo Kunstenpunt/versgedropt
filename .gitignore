@@ -7,4 +7,5 @@ spotify.txt
 versgedropt.xlsx
 resources/*.txt
 venv/
-output/
+output/*.html
+.idea
