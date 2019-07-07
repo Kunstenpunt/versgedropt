@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VERZGEDROPT</title>
+    <style>
+        .da-thumbs {
+        	list-style: none;
+        	position: relative;
+        	margin: 20px auto;
+        	padding: 0;
+        }
+
+        .da-thumbs li {
+        	float: left;
+        	margin: 5px;
+        	background: #fff;
+        	width: 175px;
+        	height: 177px;
+        	padding: 8px;
+        	position: relative;
+        	box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .da-thumbs li.dropdate {
+        	float: left;
+        	margin: 5px;
+        	width: 175px;
+        	height: 177px;
+        	background-color: white;
+        	position: relative;
+        	box-shadow: 0 0px 0px rgba(0,0,0,0.1);
+        }
+
+        .da-thumbs li.dropdate span {
+        	font-family: impact;
+        	text-transform: uppercase;
+        	font-weight: normal;
+        	font-size:50px;
+        	text-align:center;
+        	color: black;
+        	margin-top:0px;
+        	display: inline-block;
+        	vertical-align: middle;
+        	line-height: normal;
+        }
+
+        .da-thumbs li a,
+
+        .da-thumbs li a img {
+        	display: block;
+        	position: relative;
+        }
+
+        .da-thumbs li a img.dropicon {
+        		display: block;
+        		position: absolute;
+        		top: 100px;
+        		left: 100px;
+        		z-index:5;
+        }
+
+        .da-thumbs li a {
+        	overflow: hidden;
+        }
+
+        .da-thumbs li a div {
+        	position: absolute;
+        	background: #333;
+        	background: rgba(75,75,75,0.7);
+        	width: 100%;
+        	height: 100%;
+        }
+
+        .da-thumbs li a div span {
+        	display: block;
+        	font-size: 12px;
+        	padding: 10px 0;
+        	margin: 40px 20px 20px 20px;
+        	text-transform: uppercase;
+        	font-weight: normal;
+        	color: rgba(255,255,255,0.9);
+        	text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+        	border-bottom: 1px solid rgba(255,255,255,0.5);
+        	box-shadow: 0 1px 0 rgba(0,0,0,0.1), 0 -10px 0 rgba(255,255,255,0.3);
+        }
+
+        .hoes {
+        	width:175px;
+        	height:175px;
+        	display: inline-block;
+        }
+    </style>
+    <script src="js/modernizr.custom.97074.js"></script>
+    <noscript><link rel="stylesheet" type="text/css" href="css/noJS.css"/></noscript>
+    <link href='https://fonts.googleapis.com/css?family=Viga|Inconsolata' rel='stylesheet'>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+	<script type="text/javascript" src="js/jquery.hoverdir.js"></script>
+	<script type="text/javascript">
+		$(function() {
+		$(' #da-thumbs > li ').each( function() { $(this).hoverdir(); } );
+		});
+	</script>
+</head>
+<body>
+<a href="index.html"><img src="images/versgedropt.png" /></a>
+<p id="last_updated" style="font-family: courier; font-size:14px; margin-left:20px;"></p>
+<p>Een aggregatie van de digitale releases door <a href="https://beta.musicbrainz.org/area/5b8a5ee5-0bb3-34cf-9a75-c27c44e341fc/artists">artiesten in Musicbrainz uit het gebied België</a>.</p>
+<div style="text-align: center; font-family: sans-serif; color: #222222; margin: auto; width: 50%; padding: 10px;">
+    <a id="vorige-maand" href="" style="font-size: smaller; color: silver;">&laquo; VORIGE</a> &nbsp;
+    <b id="deze-maand"></b> &nbsp;
+    <a id="volgende-maand" href="" style="font-size: smaller; color: silver;">VOLGENDE &raquo;</a>
+</div>
+<section>
+    <ul id="da-thumbs" class="da-thumbs"></ul>
+</section>
+</body>
+</html>

@@ -3,7 +3,6 @@ github.txt
 google.txt
 musicbrainz.txt
 spotify.txt
-*.html
 versgedropt.xlsx
 resources/*.txt
 venv/
