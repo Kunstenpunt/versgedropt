@@ -439,7 +439,7 @@ class Versgedropt(object):
 
                 template.find("a", attrs={"id": "vorige-maand"})["href"] = page_name if page_name != datetime.now().strftime('%b %Y').replace(' ', '') + ".html" else "index.html"
                 template.find("a", attrs={"id": "volgende-maand"})["href"] = previous_previous_page_name
-                template.find("a", attrs={"id": "deze-maand"}).string = previous_page_name
+                template.find("b", attrs={"id": "deze-maand"}).string = previous_page_name
 
                 current_page_name = "index.html" if previous_page_name == datetime.now().strftime('%b %Y').replace(' ', '') + ".html" else previous_page_name
 
