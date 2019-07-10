@@ -476,7 +476,7 @@ class Versgedropt(object):
 
 
 if __name__ == "__main__":
-    vg = Versgedropt(test=True)
+    vg = Versgedropt(test=False)
     vg.set_mbids(mscbrnz_path="")
     while True:
         if datetime.now().hour == 22:
