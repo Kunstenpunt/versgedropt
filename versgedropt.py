@@ -353,6 +353,7 @@ class Versgedropt(object):
 
         self.df = DataFrame(self.data)
         self.df.sort_values(by=['release_date', 'band', 'drop'], ascending=False, inplace=True)
+        self.df.drop_duplicates(inplace=True)
         self.df.to_excel('output/versgedropt.xlsx')
 
     def put_website_online(self):
@@ -369,7 +370,7 @@ class Versgedropt(object):
 
                 for html_file in glob("output/*.html"):
                     print("pushing", html_file)
-                    sftp.put(html_file, html_file.split("/")[-1])
+                    sftp.put(html_file, os.path.basename(html_file))
 
     def generate_website(self):
         # purge previous version of html files
@@ -385,8 +386,9 @@ class Versgedropt(object):
             html = f.read()
             template = BeautifulSoup(html, "html.parser")
 
-        #set last updated line
-        template.find("p", attrs={"id": "last_updated"}).insert(0, datetime.now().strftime('%d/%m/%Y, %H:%M:%S'))
+        # set last updated line
+        template.find("p", attrs={"id": "last_updated"}).insert(0, "Laatste update op: " + datetime.now().strftime(
+            '%d/%m/%Y, %H:%M:%S'))
 
         filtered_df = self.df.loc[(self.df['release_date'] >= (datetime(2010, 1, 1).date())) & (self.df['release_date'] <= (datetime.now() + timedelta(days=120)).date())]
         rows = filtered_df.iterrows()
@@ -439,7 +441,7 @@ class Versgedropt(object):
 
                 template.find("a", attrs={"id": "vorige-maand"})["href"] = page_name if page_name != datetime.now().strftime('%b %Y').replace(' ', '') + ".html" else "index.html"
                 template.find("a", attrs={"id": "volgende-maand"})["href"] = previous_previous_page_name
-                template.find("b", attrs={"id": "deze-maand"}).string = previous_page_name
+                template.find("b", attrs={"id": "deze-maand"}).string = previous_page_name.rstrip(".html")
 
                 current_page_name = "index.html" if previous_page_name == datetime.now().strftime('%b %Y').replace(' ', '') + ".html" else previous_page_name
 
@@ -449,6 +451,9 @@ class Versgedropt(object):
                 with open("resources/template.html", "r", "utf-8") as f:
                     html = f.read()
                     template = BeautifulSoup(html, "html.parser")
+
+                # set last updated line
+                template.find("p", attrs={"id": "last_updated"}).insert(0, "Laatste update op:" + datetime.now().strftime('%d/%m/%Y, %H:%M:%S'))
 
                 previous_previous_page_name = current_page_name
 
@@ -471,9 +476,10 @@ class Versgedropt(object):
 
 
 if __name__ == "__main__":
-    vg = Versgedropt(test=False)
+    vg = Versgedropt(test=True)
     vg.set_mbids(mscbrnz_path="")
     while True:
         if datetime.now().hour == 22:
             vg.get_drops_for_musicbrainz_belgians()
             vg.generate_website()
+            vg.put_website_online()
