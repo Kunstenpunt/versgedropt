@@ -360,7 +360,7 @@ class Versgedropt(object):
         cnopts = pysftp.CnOpts()
         cnopts.hostkeys = None
         with open("resources/sftp.txt", "r") as f:
-            user, pwd = tuple(f.read().split("\n"))
+            user, pwd = tuple(f.read().split("\n")[0:-1])
         with pysftp.Connection('sftp.dc2.gpaas.net', username=user, password=pwd, cnopts=cnopts) as sftp:
             with sftp.cd('/lamp0/web/vhosts/versgeperst.be/htdocs/versgedropt'):
                 files = sftp.listdir()
