@@ -336,14 +336,16 @@ class Versgedropt(object):
                     mbartist['artist']['url-relation-list'] = []
                 print(mbartist)
 
-                types = ['streaming music', 'purchase for download', 'bandcamp', 'soundcloud', 'youtube']
+                types = ['streaming music', 'purchase for download', 'bandcamp', 'soundcloud', 'youtube', 'free streaming']
 
                 for url in mbartist['artist']['url-relation-list']:
                     if url['type'] in types:
                         current_url = url['target']
 
                         for platform in ["youtube", "spotify", "deezer", "itunes", "bandcamp", "soundcloud"]:
+                            print("platform", platform)
                             cls = getattr(self, platform)
+                            print(current_url)
                             if cls.do_it(current_url):
                                 platform_data = cls.get_drops_for_artist(mbartist, current_url)
                                 self.data.extend(platform_data)
@@ -476,10 +478,15 @@ class Versgedropt(object):
 
 
 if __name__ == "__main__":
-    vg = Versgedropt(test=False)
+    vg = Versgedropt(test=True)
     vg.set_mbids(mscbrnz_path="")
-    while True:
-        if datetime.now().hour == 22:
-            vg.get_drops_for_musicbrainz_belgians()
-            vg.generate_website()
-            vg.put_website_online()
+    if vg.test:
+        vg.get_drops_for_musicbrainz_belgians()
+        vg.generate_website()
+        vg.put_website_online()
+    else:
+        while True:
+            if datetime.now().hour == 22:
+                vg.get_drops_for_musicbrainz_belgians()
+                vg.generate_website()
+                vg.put_website_online()
