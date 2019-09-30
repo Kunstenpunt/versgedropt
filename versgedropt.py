@@ -1,4 +1,5 @@
 import spotipy
+import sys
 import musicbrainzngs
 from spotipy.oauth2 import SpotifyClientCredentials
 from requests import get, exceptions
@@ -478,7 +479,8 @@ class Versgedropt(object):
 
 
 if __name__ == "__main__":
-    vg = Versgedropt(test=True)
+    tst = sys.argv[1] if len(sys.argv) > 1 else False
+    vg = Versgedropt(test=tst)
     vg.set_mbids(mscbrnz_path="")
     if vg.test:
         vg.get_drops_for_musicbrainz_belgians()
