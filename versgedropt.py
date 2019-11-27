@@ -356,7 +356,7 @@ class Versgedropt(object):
 
         self.df = DataFrame(self.data)
         self.df.sort_values(by=['release_date', 'band', 'drop'], ascending=False, inplace=True)
-        self.df.drop_duplicates(inplace=True)
+        self.df.drop_duplicates(subset=["drop_url"], inplace=True)
         self.df.to_excel('output/versgedropt.xlsx')
 
     def put_website_online(self):
