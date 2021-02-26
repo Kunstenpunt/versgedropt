@@ -233,20 +233,20 @@ class Bandcamp(Platform):
 
     def parse_bc_release(self, url):
         soup = self.get_soup(url)
-        if soup.find("h2", attrs={"class": "trackTitle"}):
-            title = soup.find("h2", attrs={"class": "trackTitle"}).get_text().strip()
-            artist = soup.find("span", attrs={"itemprop": "byArtist"}).a.contents[0].strip()
-            releasedate_str = soup.find("meta", attrs={"itemprop": "datePublished"})["content"]
-            releasedate = datetime(int(releasedate_str[0:4]), int(releasedate_str[4:6]), int(releasedate_str[6:8])).date()
-            visual = soup.find('div', attrs={'id': 'tralbumArt'}).find('img')['src']
-            return {
-                "drop": title,
-                "band": artist,
-                "release_date": releasedate,
-                "drop_url": url,
-                "drop_id": url,
-                "drop_visual": visual
-            }
+        data = soup.find("script", attrs={"type": "application/ld+json"})
+        d = loads(str(data.get_text()))
+        title = d["name"]
+        artist = d["byArtist"]
+        releasedate = parse(d["datePublished"])
+        visual = d["image"][0]
+        return {
+            "drop": title,
+            "band": artist,
+            "release_date": releasedate,
+            "drop_url": url,
+            "drop_id": url,
+            "drop_visual": visual
+        }
 
 
 class Soundcloud(Platform):
@@ -298,7 +298,7 @@ class Versgedropt(object):
                 "26895123-efb1-4b0b-9868-9fc2138d46b6", #poldoore
             ]
         else:
-            mscbrnz_path = "/home/tom/PycharmProjects/buitenlandse_concerten_grabber/resources/belgian_mscbrnz_artists.xlsx"
+            mscbrnz_path = "resources/belgian_mscbrnz_artists.xlsx"
             mscbrnzs = read_excel(mscbrnz_path)
             self.mbids = mscbrnzs["mbid"].unique().tolist()
 
@@ -344,9 +344,9 @@ class Versgedropt(object):
                         current_url = url['target']
 
                         for platform in ["youtube", "spotify", "deezer", "itunes", "bandcamp", "soundcloud"]:
-                            print("platform", platform)
+                            print("platform", platform, current_url)
                             cls = getattr(self, platform)
-                            print(current_url)
+                            print(cls.do_it(current_url))
                             if cls.do_it(current_url):
                                 platform_data = cls.get_drops_for_artist(mbartist, current_url)
                                 self.data.extend(platform_data)
@@ -363,7 +363,7 @@ class Versgedropt(object):
         cnopts = pysftp.CnOpts()
         cnopts.hostkeys = None
         with open("resources/sftp.txt", "r") as f:
-            user, pwd = tuple(f.read().split("\n")[0:-1])
+            user, pwd = tuple(f.read().split("\n"))
         with pysftp.Connection('sftp.dc2.gpaas.net', username=user, password=pwd, cnopts=cnopts) as sftp:
             with sftp.cd('/lamp0/web/vhosts/versgeperst.be/htdocs/versgedropt'):
                 files = sftp.listdir()
@@ -488,7 +488,7 @@ if __name__ == "__main__":
         vg.put_website_online()
     else:
         while True:
-            if datetime.now().hour == 22:
+            if datetime.now().hour == 14:
                 vg.get_drops_for_musicbrainz_belgians()
                 vg.generate_website()
                 vg.put_website_online()
