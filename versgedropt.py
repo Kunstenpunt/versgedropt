@@ -1,6 +1,7 @@
 import spotipy
 import sys
 import musicbrainzngs
+from musicbrainzngs import set_useragent, search_artists, musicbrainz, get_artist_by_id
 from spotipy.oauth2 import SpotifyClientCredentials
 from requests import get, exceptions
 from json import loads
@@ -290,6 +291,20 @@ class Soundcloud(Platform):
 
 
 class Versgedropt(object):
+    def __search_artists_in_area(self, area, limit, offset):
+        artists = {"artist-list": [], "artist-count": -1}
+        while artists["artist-count"] < 0:
+            try:
+                sleep(1.0)
+                artists_area = search_artists(country=area, area=area, beginarea=area, endarea=area, limit=limit, offset=offset)
+                artists['artist-list'] = artists_area["artist-list"]
+                artists['artist-count'] = artists_area["artist-count"]
+            except musicbrainz.NetworkError:
+                sleep(25.0)
+            except musicbrainz.ResponseError:
+                sleep(25.0)
+        return artists
+
     def set_mbids(self, mscbrnz_path):
         if self.test:
             self.mbids = [
@@ -298,9 +313,23 @@ class Versgedropt(object):
                 "26895123-efb1-4b0b-9868-9fc2138d46b6", #poldoore
             ]
         else:
-            mscbrnz_path = "/home/tom/PycharmProjects/buitenlandse_concerten_grabber/resources/belgian_mscbrnz_artists.xlsx"
-            mscbrnzs = read_excel(mscbrnz_path)
-            self.mbids = mscbrnzs["mbid"].unique().tolist()
+
+            # get new artists or updates from musicbrainz
+            updated = []
+            set_useragent("kunstenpunt", "0.1", "github.com/kunstenpunt")
+            i = 1
+            offset = 0
+            limit = 25
+            total_search_results = 1
+            while offset < total_search_results:
+                search_results = self.__search_artists_in_area("Belgium", limit, offset)
+                for hit in list(search_results["artist-list"]):
+                    updated.append(hit["id"])
+                    i += 1
+                offset += limit
+                total_search_results = search_results["artist-count"]
+
+            self.mbids = updated
 
     def __init__(self, test=False):
         self.test = test
